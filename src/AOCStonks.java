@@ -18,6 +18,8 @@ import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
+import net.dv8tion.jda.api.utils.messages.MessageCreateBuilder;
+import net.dv8tion.jda.api.utils.messages.MessageCreateData;
 
 public class AOCStonks extends ListenerAdapter {
 
@@ -41,12 +43,20 @@ public class AOCStonks extends ListenerAdapter {
 			.complete();
 
 		while(true) {
-			try {
-				ch.sendMessage("```\n" + buildStonks() + "```").queue();
-			}catch(Exception e) {
-				ch.sendMessage("Failed to retrieve stonks :(").queue();
-			}
+			ch.sendMessage(buildStonksMessage()).queue();
 			Thread.sleep(1000 * 60 * 60 * 6);
+		}
+	}
+
+	private static MessageCreateData buildStonksMessage() {
+		try {
+			return new MessageCreateBuilder()
+				.setContent("```\n" + buildStonks() + "```")
+				.build();
+		}catch(Exception e) {
+			return new MessageCreateBuilder()
+					.setContent("Failed to retrieve stonks :(")
+					.build();
 		}
 	}
 
@@ -67,11 +77,19 @@ public class AOCStonks extends ListenerAdapter {
 		Collections.reverse(stonks);
 
 		String tot = "";
+		tot += String.format("Day | First only |     Both | Both Percent |   Quit | Total Quit\n", "Day", "First only", "Both", "Both Percent", "Quit", "Total Quit");
 		for(int i = 0; i < stonks.size(); i++) {
 			DayStonks s = stonks.get(i);
 			DayStonks p = i == 0 ? null : stonks.get(i-1);
 			int quit = p == null ? 0 : p.total - s.total;
-			tot += String.format("%02d: First only: %8d | Both: %8d | Both Percent: %05.2f%% | Quit: %05.2f%%\n", s.day, s.firstonly, s.both, (s.both / (float) s.total) * 100, quit / (float) (p == null ? 1 : p.total) * 100);
+			int totalQuit = stonks.get(0).total - s.total;
+			tot += String.format(" %02d |   %8d | %8d |       %05.2f%% | %05.2f%% |     %05.2f%%\n",
+					s.day,
+					s.firstonly,
+					s.both,
+					(s.both / (float) s.total) * 100,
+					quit / (float) (p == null ? 1 : p.total) * 100,
+					totalQuit / (float) (stonks.get(0).total) * 100);
 		}
 
 		return tot;
@@ -79,11 +97,9 @@ public class AOCStonks extends ListenerAdapter {
 
 	@Override
 	public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
-		try {
-			event.reply("```\n" + buildStonks() + "```").queue();
-		} catch (IOException e) {
-			event.reply("Oh no, something broke :(").queue();
-		}
+		event.deferReply().queue(s -> {
+			s.sendMessage(buildStonksMessage()).queue();
+		});
 	}
 
 }
